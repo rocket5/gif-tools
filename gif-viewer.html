@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIF Viewer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    /* Drop Zone */
+    .drop-zone {
+      border: 3px dashed #4a4a6a;
+      border-radius: 12px;
+      padding: 4rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #242442;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: #7b68ee;
+      background: #2d2d4a;
+    }
+
+    .drop-zone-text {
+      font-size: 1.25rem;
+      color: #888;
+    }
+
+    .drop-zone-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    /* Loading State */
+    .loading {
+      text-align: center;
+      padding: 4rem;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #4a4a6a;
+      border-top-color: #7b68ee;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error State */
+    .error {
+      text-align: center;
+      padding: 3rem;
+      background: #2d2d4a;
+      border-radius: 12px;
+    }
+
+    .error-message {
+      color: #ff6b6b;
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Preview Area */
+    .preview-container {
+      display: none;
+    }
+
+    .preview-container.active {
+      display: block;
+    }
+
+    .canvas-wrapper {
+      background:
+        linear-gradient(45deg, #3a3a3a 25%, transparent 25%),
+        linear-gradient(-45deg, #3a3a3a 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #3a3a3a 75%),
+        linear-gradient(-45deg, transparent 75%, #3a3a3a 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      background-color: #2a2a2a;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      min-height: 200px;
+      overflow: auto;
+    }
+
+    #gif-canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: #3d3d5c;
+      color: #e0e0e0;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background: #4d4d6c;
+    }
+
+    .btn:active {
+      background: #5d5d7c;
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #7b68ee;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #8b78fe;
+    }
+
+    .btn-danger {
+      background: #5c3d3d;
+    }
+
+    .btn-danger:hover {
+      background: #6c4d4d;
+    }
+
+    /* Attributes Panel */
+    .attributes {
+      margin-top: 1.5rem;
+      background: #242442;
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .attributes h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .attributes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+
+    .attribute {
+      background: #2d2d4a;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+    }
+
+    .attribute-label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .attribute-value {
+      font-size: 1rem;
+      color: #fff;
+      word-break: break-all;
+    }
+
+    /* Frame Counter */
+    .frame-counter {
+      text-align: center;
+      margin-top: 0.75rem;
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    /* Utility Classes */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GIF Viewer</h1>
+
+    <!-- Empty State / Drop Zone -->
+    <div id="drop-zone" class="drop-zone">
+      <div class="drop-zone-icon">🖼️</div>
+      <div class="drop-zone-text">Drop a GIF here or click to browse</div>
+      <input type="file" id="file-input" class="file-input" accept=".gif,image/gif">
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <div>Parsing GIF...</div>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="error hidden">
+      <div class="error-message" id="error-message">Not a valid GIF file</div>
+      <button class="btn btn-primary" id="try-again-btn">Try Again</button>
+    </div>
+
+    <!-- Preview State -->
+    <div id="preview" class="preview-container">
+      <div class="canvas-wrapper">
+        <canvas id="gif-canvas"></canvas>
+      </div>
+
+      <div class="frame-counter">
+        Frame <span id="current-frame">1</span> of <span id="total-frames">1</span>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="step-back-btn" title="Previous Frame">⏮ Prev</button>
+        <button class="btn btn-primary" id="play-pause-btn" title="Play/Pause">⏸ Pause</button>
+        <button class="btn" id="step-forward-btn" title="Next Frame">Next ⏭</button>
+        <button class="btn" id="restart-btn" title="Restart">↺ Restart</button>
+        <button class="btn btn-danger" id="clear-btn" title="Clear">✕ Clear</button>
+      </div>
+
+      <div class="attributes">
+        <h2>File Information</h2>
+        <div class="attributes-grid">
+          <div class="attribute">
+            <div class="attribute-label">File Name</div>
+            <div class="attribute-value" id="attr-filename">—</div>
+          </div>
+          <div class="attribute">
+            <div class="attribute-label">File Size</div>
+            <div class="attribute-value" id="attr-filesize">—</div>
+          </div>
+          <div class="attribute">
+            <div class="attribute-label">Dimensions</div>
+            <div class="attribute-value" id="attr-dimensions">—</div>
+          </div>
+          <div class="attribute">
+            <div class="attribute-label">Frames</div>
+            <div class="attribute-value" id="attr-frames">—</div>
+          </div>
+          <div class="attribute">
+            <div class="attribute-label">Duration</div>
+            <div class="attribute-value" id="attr-duration">—</div>
+          </div>
+          <div class="attribute">
+            <div class="attribute-label">Loop</div>
+            <div class="attribute-value" id="attr-loop">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { parseGIF, decompressFrames } from 'https://esm.sh/gifuct-js@2.1.2';
+
+    (function() {
+      // DOM Elements
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('file-input');
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const errorMessage = document.getElementById('error-message');
+      const previewEl = document.getElementById('preview');
+      const canvas = document.getElementById('gif-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Buttons
+      const playPauseBtn = document.getElementById('play-pause-btn');
+      const restartBtn = document.getElementById('restart-btn');
+      const stepBackBtn = document.getElementById('step-back-btn');
+      const stepForwardBtn = document.getElementById('step-forward-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const tryAgainBtn = document.getElementById('try-again-btn');
+
+      // Attribute elements
+      const attrFilename = document.getElementById('attr-filename');
+      const attrFilesize = document.getElementById('attr-filesize');
+      const attrDimensions = document.getElementById('attr-dimensions');
+      const attrFrames = document.getElementById('attr-frames');
+      const attrDuration = document.getElementById('attr-duration');
+      const attrLoop = document.getElementById('attr-loop');
+      const currentFrameEl = document.getElementById('current-frame');
+      const totalFramesEl = document.getElementById('total-frames');
+
+      // State
+      let frames = [];
+      let frameImageDataURLs = []; // Pre-rendered frame images
+      let frameIndex = 0;
+      let isPlaying = false;
+      let playbackTimeout = null;
+      let gifWidth = 0;
+      let gifHeight = 0;
+      let compositeCanvas = null;
+      let compositeCtx = null;
+      let patchCanvas = null;
+      let patchCtx = null;
+      let previousStateCanvas = null;
+      let previousStateCtx = null;
+
+      // Utility: Format file size
+      function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      }
+
+      // Utility: Format duration
+      function formatDuration(ms) {
+        if (ms < 1000) return ms + 'ms';
+        return (ms / 1000).toFixed(2) + 's';
+      }
+
+      // Show/hide states
+      function showState(state) {
+        dropZone.classList.add('hidden');
+        loadingEl.classList.add('hidden');
+        errorEl.classList.add('hidden');
+        previewEl.classList.remove('active');
+
+        switch (state) {
+          case 'empty':
+            dropZone.classList.remove('hidden');
+            break;
+          case 'loading':
+            loadingEl.classList.remove('hidden');
+            break;
+          case 'error':
+            errorEl.classList.remove('hidden');
+            break;
+          case 'preview':
+            previewEl.classList.add('active');
+            break;
+        }
+      }
+
+      // Show error
+      function showError(message) {
+        errorMessage.textContent = message;
+        showState('error');
+      }
+
+      // Reset state
+      function reset() {
+        stopPlayback();
+        frames = [];
+        frameImageDataURLs = [];
+        frameIndex = 0;
+        isPlaying = false;
+        gifWidth = 0;
+        gifHeight = 0;
+        compositeCanvas = null;
+        compositeCtx = null;
+        patchCanvas = null;
+        patchCtx = null;
+        previousStateCanvas = null;
+        previousStateCtx = null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        fileInput.value = '';
+        showState('empty');
+      }
+
+      // Stop playback
+      function stopPlayback() {
+        isPlaying = false;
+        if (playbackTimeout) {
+          clearTimeout(playbackTimeout);
+          playbackTimeout = null;
+        }
+        updatePlayPauseButton();
+      }
+
+      // Update play/pause button
+      function updatePlayPauseButton() {
+        playPauseBtn.innerHTML = isPlaying ? '⏸ Pause' : '▶ Play';
+      }
+
+      // Draw a single frame patch to the composite canvas with proper disposal handling
+      function drawFrameToComposite(index) {
+        const frame = frames[index];
+        const { dims, patch, disposalType } = frame;
+
+        // Before drawing this frame, handle disposal from previous frame
+        // But we need to save state BEFORE drawing if THIS frame's disposal is "restore to previous"
+        if (disposalType === 3) {
+          // Save current state before drawing this frame
+          previousStateCtx.clearRect(0, 0, gifWidth, gifHeight);
+          previousStateCtx.drawImage(compositeCanvas, 0, 0);
+        }
+
+        // Create ImageData from patch and draw to patch canvas
+        const imageData = new ImageData(
+          new Uint8ClampedArray(patch.buffer),
+          dims.width,
+          dims.height
+        );
+
+        // Resize patch canvas if needed
+        if (patchCanvas.width !== dims.width || patchCanvas.height !== dims.height) {
+          patchCanvas.width = dims.width;
+          patchCanvas.height = dims.height;
+        }
+
+        patchCtx.putImageData(imageData, 0, 0);
+
+        // Draw the patch onto the composite canvas using drawImage for proper alpha blending
+        compositeCtx.drawImage(patchCanvas, dims.left, dims.top);
+      }
+
+      // Apply disposal method after displaying a frame
+      function applyDisposal(index) {
+        const frame = frames[index];
+        const { dims, disposalType } = frame;
+
+        switch (disposalType) {
+          case 2: // Restore to background (clear the frame area)
+            compositeCtx.clearRect(dims.left, dims.top, dims.width, dims.height);
+            break;
+          case 3: // Restore to previous state
+            compositeCtx.clearRect(0, 0, gifWidth, gifHeight);
+            compositeCtx.drawImage(previousStateCanvas, 0, 0);
+            break;
+          // case 0, 1: Do not dispose - leave as is
+        }
+      }
+
+      // Render current frame to display canvas
+      function renderFrame(index) {
+        if (!frames.length) return;
+
+        // Copy composite to main canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(compositeCanvas, 0, 0, canvas.width, canvas.height);
+
+        // Update frame counter
+        currentFrameEl.textContent = index + 1;
+      }
+
+      // Play animation
+      function playAnimation() {
+        if (!isPlaying || !frames.length) return;
+
+        // Draw current frame to composite
+        drawFrameToComposite(frameIndex);
+
+        // Render to display
+        renderFrame(frameIndex);
+
+        const frame = frames[frameIndex];
+        let delay = frame.delay || 100; // Default to 100ms if no delay
+        if (delay < 20) delay = 100; // Browsers cap at ~20ms, treat 0/10 as 100ms
+
+        // Apply disposal for this frame (affects next frame)
+        applyDisposal(frameIndex);
+
+        // Move to next frame
+        frameIndex = (frameIndex + 1) % frames.length;
+
+        // If we looped back to start, reset the composite canvas
+        if (frameIndex === 0) {
+          compositeCtx.clearRect(0, 0, gifWidth, gifHeight);
+        }
+
+        playbackTimeout = setTimeout(playAnimation, delay);
+      }
+
+      // Toggle play/pause
+      function togglePlayPause() {
+        if (isPlaying) {
+          stopPlayback();
+        } else {
+          isPlaying = true;
+          updatePlayPauseButton();
+          // Rebuild composite state before resuming to ensure consistency
+          if (frameIndex > 0) {
+            // Build up to the frame BEFORE current, then apply its disposal
+            buildCompositeToFrame(frameIndex - 1);
+            applyDisposal(frameIndex - 1);
+          } else {
+            compositeCtx.clearRect(0, 0, gifWidth, gifHeight);
+          }
+          playAnimation();
+        }
+      }
+
+      // Build composite up to a specific frame
+      function buildCompositeToFrame(targetIndex) {
+        compositeCtx.clearRect(0, 0, gifWidth, gifHeight);
+
+        for (let i = 0; i <= targetIndex; i++) {
+          drawFrameToComposite(i);
+
+          // Apply disposal for all frames except the last one we're drawing
+          if (i < targetIndex) {
+            applyDisposal(i);
+          }
+        }
+      }
+
+      // Step to specific frame
+      function stepToFrame(index) {
+        stopPlayback();
+
+        // Rebuild composite from frame 0 to target frame
+        buildCompositeToFrame(index);
+
+        // Render to display
+        renderFrame(index);
+
+        frameIndex = index;
+      }
+
+      // Parse and display GIF
+      async function processGIF(file) {
+        if (!file.type.includes('gif') && !file.name.toLowerCase().endsWith('.gif')) {
+          showError('Not a valid GIF file');
+          return;
+        }
+
+        showState('loading');
+
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const gif = parseGIF(arrayBuffer);
+          const parsedFrames = decompressFrames(gif, true);
+
+          if (!parsedFrames || parsedFrames.length === 0) {
+            throw new Error('No frames found in GIF');
+          }
+
+          frames = parsedFrames;
+          gifWidth = gif.lsd.width;
+          gifHeight = gif.lsd.height;
+
+          // Create composite canvas for building up the animation
+          compositeCanvas = document.createElement('canvas');
+          compositeCanvas.width = gifWidth;
+          compositeCanvas.height = gifHeight;
+          compositeCtx = compositeCanvas.getContext('2d');
+
+          // Create patch canvas for drawing individual frame patches
+          patchCanvas = document.createElement('canvas');
+          patchCtx = patchCanvas.getContext('2d');
+
+          // Create canvas for storing previous state (disposal type 3)
+          previousStateCanvas = document.createElement('canvas');
+          previousStateCanvas.width = gifWidth;
+          previousStateCanvas.height = gifHeight;
+          previousStateCtx = previousStateCanvas.getContext('2d');
+
+          // Set up main display canvas
+          canvas.width = gifWidth;
+          canvas.height = gifHeight;
+
+          // Calculate total duration
+          const totalDuration = frames.reduce((sum, f) => sum + (f.delay || 100), 0);
+
+          // Get loop info from GIF
+          let loopText = 'Infinite';
+          if (gif.gce && gif.gce.length > 0) {
+            // Check for NETSCAPE extension
+            const netscape = gif.applicationExtensions?.find(
+              ext => ext.identifier === 'NETSCAPE'
+            );
+            if (netscape) {
+              const loops = netscape.data[1] | (netscape.data[2] << 8);
+              if (loops === 0) {
+                loopText = 'Infinite';
+              } else if (loops === 1) {
+                loopText = 'Once';
+              } else {
+                loopText = loops + ' times';
+              }
+            }
+          }
+
+          // Update attributes
+          attrFilename.textContent = file.name;
+          attrFilesize.textContent = formatFileSize(file.size);
+          attrDimensions.textContent = gifWidth + ' × ' + gifHeight + ' px';
+          attrFrames.textContent = frames.length;
+          attrDuration.textContent = formatDuration(totalDuration);
+          attrLoop.textContent = loopText;
+          totalFramesEl.textContent = frames.length;
+
+          // Show preview and start playing
+          frameIndex = 0;
+          showState('preview');
+          isPlaying = true;
+          updatePlayPauseButton();
+          playAnimation();
+
+        } catch (err) {
+          console.error('Error parsing GIF:', err);
+          showError('Failed to parse GIF: ' + err.message);
+        }
+      }
+
+      // Event: Drop zone click
+      dropZone.addEventListener('click', () => fileInput.click());
+
+      // Event: File input change
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) processGIF(file);
+      });
+
+      // Event: Drag and drop
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
+
+      dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) processGIF(file);
+      });
+
+      // Event: Play/Pause
+      playPauseBtn.addEventListener('click', togglePlayPause);
+
+      // Event: Restart
+      restartBtn.addEventListener('click', () => {
+        stopPlayback();
+        frameIndex = 0;
+        compositeCtx.clearRect(0, 0, gifWidth, gifHeight);
+        isPlaying = true;
+        updatePlayPauseButton();
+        playAnimation();
+      });
+
+      // Event: Step Back
+      stepBackBtn.addEventListener('click', () => {
+        const newIndex = (frameIndex - 1 + frames.length) % frames.length;
+        stepToFrame(newIndex);
+      });
+
+      // Event: Step Forward
+      stepForwardBtn.addEventListener('click', () => {
+        const newIndex = (frameIndex + 1) % frames.length;
+        stepToFrame(newIndex);
+      });
+
+      // Event: Clear
+      clearBtn.addEventListener('click', reset);
+
+      // Event: Try Again
+      tryAgainBtn.addEventListener('click', reset);
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (!previewEl.classList.contains('active')) return;
+
+        switch (e.key) {
+          case ' ':
+            e.preventDefault();
+            togglePlayPause();
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            stepBackBtn.click();
+            break;
+          case 'ArrowRight':
+            e.preventDefault();
+            stepForwardBtn.click();
+            break;
+          case 'r':
+          case 'R':
+            restartBtn.click();
+            break;
+          case 'Escape':
+            reset();
+            break;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
